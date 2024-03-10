@@ -73,6 +73,7 @@ template SmallOddFactorization(n, b) {
 
     // Constrain each factor to be small and odd.
     // We're going to need `n` subcircuits for small-odd-ness.
+    // HER: what this does? Why its necessary to use the component keyword?
     component smallOdd[n];
     for (var i = 0; i < n; i++) {
         smallOdd[i] = SmallOdd(b);

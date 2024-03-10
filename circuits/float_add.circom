@@ -67,6 +67,7 @@ template Num2Bits(b) {
 
     for (var i = 0; i < b; i++) {
         bits[i] <-- (in >> i) & 1;
+        // Enforces values of bits are only 1 and 0
         bits[i] * (1 - bits[i]) === 0;
     }
     var sum_of_bits = 0;
@@ -131,6 +132,7 @@ template LessThan(n) {
 
     component n2b = Num2Bits(n+1);
 
+    // (1<<n) is for under flow protection
     n2b.in <== in[0]+ (1<<n) - in[1];
 
     out <== 1-n2b.bits[n];
@@ -148,7 +150,16 @@ template CheckBitLength(b) {
     signal input in;
     signal output out;
 
-    // TODO
+    var sum_of_bits = 0;
+    for (var i = 0; i < b; i++) {
+        sum_of_bits += (2 ** i) * ((in >> i) & 1);
+    }
+
+    component equal = IsEqual();
+    
+    equal.in[0] <== in;
+    equal.in[1] <== sum_of_bits; 
+    out <== equal.out;  
 }
 
 /*
