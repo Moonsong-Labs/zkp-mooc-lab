@@ -311,7 +311,36 @@ template MSNZB(b) {
     signal input skip_checks;
     signal output one_hot[b];
 
-    // TODO
+    // Enforce in != 0
+    component is_zero = IsZero();
+    is_zero.in <== in;
+
+    component is_in_zero = IfThenElse();
+    is_in_zero.cond <== skip_checks;
+    is_in_zero.L <-- 0;
+    is_in_zero.R <-- is_zero.out;
+    is_in_zero.out === 0;
+
+    // Assign values
+    component if_else[b];
+    for (var i = 0; i < b; i++) {
+        if_else[i] = IfThenElse();
+        if_else[i].cond <-- (((2 ** i) <= in) * (in < (2 ** (i + 1))));
+        if_else[i].L <== 1;
+        if_else[i].R <== 0;
+        one_hot[i] <== if_else[i].out;
+    }
+
+    // Checks that only one value is 1 and the rest 0
+    var sum_of_bits = 0;
+    for (var i = 0; i < b; i++) {
+        one_hot[i] * (1 - one_hot[i]) === 0;
+        sum_of_bits += one_hot[i];
+    }
+
+    1 === sum_of_bits;
+
+    // TODO: if skip_check == 1 it just need to return true
 }
 
 /*
