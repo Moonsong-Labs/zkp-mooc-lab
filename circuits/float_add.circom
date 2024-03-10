@@ -145,6 +145,7 @@ template LessThan(n) {
 /*
  * Outputs `out` = 1 if `in` is at most `b` bits long, and 0 otherwise.
  */
+ // HER -> sure that we can user num2bit here
 template CheckBitLength(b) {
     assert(b < 254);
     signal input in;
@@ -205,12 +206,20 @@ template CheckWellFormedness(k, p) {
 /*
  * Right-shifts `b`-bit long `x` by `shift` bits to output `y`, where `shift` is a public circuit parameter.
  */
+// HER -> IDK why the test is failing (large bitwidth)
 template RightShift(b, shift) {
     assert(shift < b);
     signal input x;
     signal output y;
+    signal temp;
 
-    // TODO
+    component lessthan = LessThan(b);
+    lessthan.in[0] <== shift;
+    lessthan.in[1] <== b;
+    1 === lessthan.out;
+
+    temp <-- (x >> shift);
+    y <== temp;
 }
 
 /*
@@ -271,8 +280,23 @@ template LeftShift(shift_bound) {
     signal input shift;
     signal input skip_checks;
     signal output y;
+    signal temp;
 
-    // TODO
+    component shift_less_than_bound = LessThan(shift_bound);
+    shift_less_than_bound.in[0] <-- shift;
+    shift_less_than_bound.in[1] <-- shift_bound;
+
+    // HER: check 0 <= shift is missing
+
+    component check_bound = IfThenElse();
+    check_bound.cond <-- skip_checks;
+    check_bound.L <-- 1;
+    check_bound.R <== shift_less_than_bound.out;
+    check_bound.out === 1;
+
+    temp <-- (x << shift);
+    y <== temp;
+
 }
 
 /*
