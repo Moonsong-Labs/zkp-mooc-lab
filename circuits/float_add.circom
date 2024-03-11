@@ -351,14 +351,34 @@ template MSNZB(b) {
  * If `skip_checks` = 1, then we don't care about the output and the non-zero constraint is not enforced.
  */
 template Normalize(k, p, P) {
+    // TODO: test not passing
+
     signal input e;
     signal input m;
     signal input skip_checks;
     signal output e_out;
     signal output m_out;
+    signal m_temp;
     assert(P > p);
+    assert(m != 0);
 
-    // TODO
+    component msnzb = MSNZB(P + 1);
+    msnzb.in <== m;
+    msnzb.skip_checks <== skip_checks;
+
+    signal msnzb_num;
+    var msnzb_temp = 0;
+    component if_else[P + 1];
+    for (var i = 0; i < (P + 1); i++) {
+        if (msnzb.one_hot[i] == 1) {
+           msnzb_temp = i;
+        }
+    }
+    msnzb_num <-- msnzb_temp;
+
+    m_temp <-- m << (msnzb_num - P);
+    m_out <== m_temp;
+    e_out <== msnzb_num + e - p;
 }
 
 /*
