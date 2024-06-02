@@ -67,6 +67,7 @@ template Num2Bits(b) {
 
     for (var i = 0; i < b; i++) {
         bits[i] <-- (in >> i) & 1;
+        // Enforces values of bits are only 1 and 0
         bits[i] * (1 - bits[i]) === 0;
     }
     var sum_of_bits = 0;
@@ -131,6 +132,7 @@ template LessThan(n) {
 
     component n2b = Num2Bits(n+1);
 
+    // (1<<n) is for under flow protection
     n2b.in <== in[0]+ (1<<n) - in[1];
 
     out <== 1-n2b.bits[n];
@@ -143,12 +145,24 @@ template LessThan(n) {
 /*
  * Outputs `out` = 1 if `in` is at most `b` bits long, and 0 otherwise.
  */
+ // HER -> sure that we can user num2bit here
 template CheckBitLength(b) {
     assert(b < 254);
     signal input in;
     signal output out;
+    signal sum_of_bits_result;
 
-    // TODO
+    var sum_of_bits = 0;
+    for (var i = 0; i < b; i++) {
+        sum_of_bits += (2 ** i) * ((in >> i) & 1);
+    }
+
+    sum_of_bits_result <-- sum_of_bits;
+    component equal = IsEqual();
+
+    equal.in[0] <== in;
+    equal.in[1] <== sum_of_bits_result; 
+    out <== equal.out;  
 }
 
 /*
@@ -192,12 +206,20 @@ template CheckWellFormedness(k, p) {
 /*
  * Right-shifts `b`-bit long `x` by `shift` bits to output `y`, where `shift` is a public circuit parameter.
  */
+// HER -> IDK why the test is failing (large bitwidth)
 template RightShift(b, shift) {
     assert(shift < b);
     signal input x;
     signal output y;
+    signal temp;
 
-    // TODO
+    component lessthan = LessThan(b);
+    lessthan.in[0] <== shift;
+    lessthan.in[1] <== b;
+    1 === lessthan.out;
+
+    temp <-- (x >> shift);
+    y <== temp;
 }
 
 /*
@@ -258,8 +280,23 @@ template LeftShift(shift_bound) {
     signal input shift;
     signal input skip_checks;
     signal output y;
+    signal temp;
 
-    // TODO
+    component shift_less_than_bound = LessThan(shift_bound);
+    shift_less_than_bound.in[0] <-- shift;
+    shift_less_than_bound.in[1] <-- shift_bound;
+
+    // HER: check 0 <= shift is missing
+
+    component check_bound = IfThenElse();
+    check_bound.cond <-- skip_checks;
+    check_bound.L <-- 1;
+    check_bound.R <== shift_less_than_bound.out;
+    check_bound.out === 1;
+
+    temp <-- (x << shift);
+    y <== temp;
+
 }
 
 /*
@@ -274,7 +311,36 @@ template MSNZB(b) {
     signal input skip_checks;
     signal output one_hot[b];
 
-    // TODO
+    // Enforce in != 0
+    component is_zero = IsZero();
+    is_zero.in <== in;
+
+    component is_in_zero = IfThenElse();
+    is_in_zero.cond <== skip_checks;
+    is_in_zero.L <-- 0;
+    is_in_zero.R <-- is_zero.out;
+    is_in_zero.out === 0;
+
+    // Assign values
+    component if_else[b];
+    for (var i = 0; i < b; i++) {
+        if_else[i] = IfThenElse();
+        if_else[i].cond <-- (((2 ** i) <= in) * (in < (2 ** (i + 1))));
+        if_else[i].L <== 1;
+        if_else[i].R <== 0;
+        one_hot[i] <== if_else[i].out;
+    }
+
+    // Checks that only one value is 1 and the rest 0
+    var sum_of_bits = 0;
+    for (var i = 0; i < b; i++) {
+        one_hot[i] * (1 - one_hot[i]) === 0;
+        sum_of_bits += one_hot[i];
+    }
+
+    1 === sum_of_bits;
+
+    // TODO: if skip_check == 1 it just need to return true
 }
 
 /*
@@ -285,14 +351,34 @@ template MSNZB(b) {
  * If `skip_checks` = 1, then we don't care about the output and the non-zero constraint is not enforced.
  */
 template Normalize(k, p, P) {
+    // TODO: test not passing
+
     signal input e;
     signal input m;
     signal input skip_checks;
     signal output e_out;
     signal output m_out;
+    signal m_temp;
     assert(P > p);
+    assert(m != 0);
 
-    // TODO
+    component msnzb = MSNZB(P + 1);
+    msnzb.in <== m;
+    msnzb.skip_checks <== skip_checks;
+
+    signal msnzb_num;
+    var msnzb_temp = 0;
+    component if_else[P + 1];
+    for (var i = 0; i < (P + 1); i++) {
+        if (msnzb.one_hot[i] == 1) {
+           msnzb_temp = i;
+        }
+    }
+    msnzb_num <-- msnzb_temp;
+
+    m_temp <-- m << (msnzb_num - P);
+    m_out <== m_temp;
+    e_out <== msnzb_num + e - p;
 }
 
 /*
